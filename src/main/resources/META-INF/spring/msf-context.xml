@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:msf="http://code.meilele.com/schema/msf"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+		http://code.meilele.com/schema/msf http://code.meilele.com/schema/msf/msf.xsd">
+
+    <msf:application name="im-gateway"/>
+    <msf:registry address="${msf.registry.address}" timeout="15000"/>
+    <msf:protocol port="${msf.port}"/>
+    <msf:consumer timeout="2000" retries="2" check="false" group="${msf.group}" version="${msf.version}"/>
+    <msf:provider group="${msf.group}" version="${msf.version}"/>
+    <!-- 扫描注解包路径，多个包用逗号分隔，不填pacakge表示扫描当前ApplicationContext中所有的类 -->
+
+    <!-- <bean class="com.meilele.common.dubbo.DubboAnnotationProcessor" /> -->
+    <msf:reference id="allocationFacade"
+                   interface="com.meilele.im.dealer.AllocationFacade" group="${msf.group}" version="${msf.version}"/>
+
+    <msf:reference id="userStatusFacade"
+                   interface="com.meilele.im.core.facade.UserStatusFacade" group="${msf.group}"
+                   version="${msf.version}"/>
+
+</beans>

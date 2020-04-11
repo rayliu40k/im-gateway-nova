@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="false">
+	<!-- 控制台 -->
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<target>System.out</target>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -【%X{traceId}】- %msg%n
+			</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<!-- 总日志 -->
+	<appender name="IM-GATEWAY-FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${JBOSS_LOG_DIR}/im-gateway/im-gateway.log</file>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -【%X{traceId}】- %msg%n
+			</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${JBOSS_LOG_DIR}/im-gateway/im-gateway-%d{yyyy-MM-dd}.log
+			</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>10GB</totalSizeCap>
+		</rollingPolicy>
+	</appender>
+
+	<!-- 错误日志 -->
+	<appender name="ERROR-FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${JBOSS_LOG_DIR}/im-gateway/error.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${JBOSS_LOG_DIR}/im-gateway/error-%d{yyyy-MM-dd}.log
+			</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>10GB</totalSizeCap>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -【%X{traceId}】- %msg%n
+			</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+		<filter class="ch.qos.logback.classic.filter.LevelFilter">
+			<level>ERROR</level>
+			<onMatch>ACCEPT</onMatch>
+			<onMismatch>DENY</onMismatch>
+		</filter>
+	</appender>
+	
+	<!-- 保活日志 -->
+	<appender name="KEEPALIVE-FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${JBOSS_LOG_DIR}/im-gateway/keepalive.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${JBOSS_LOG_DIR}/im-gateway/keepalive-%d{yyyy-MM-dd}.log
+			</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>10GB</totalSizeCap>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+			</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+	
+	<!-- 活跃客户端连接日志 -->
+	<appender name="ONLINE-USER-FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${JBOSS_LOG_DIR}/im-gateway/online_user.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${JBOSS_LOG_DIR}/im-gateway/online_user-%d{yyyy-MM-dd}.log
+			</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>10GB</totalSizeCap>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<!-- Netty日志 -->
+	<appender name="NETTY-FILE"
+		class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${JBOSS_LOG_DIR}/im-gateway/netty.log</file>
+		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+			<fileNamePattern>${JBOSS_LOG_DIR}/im-gateway/netty-%d{yyyy-MM-dd}.log
+			</fileNamePattern>
+			<maxHistory>30</maxHistory>
+			<totalSizeCap>10GB</totalSizeCap>
+		</rollingPolicy>
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n
+			</pattern>
+			<charset>UTF-8</charset>
+		</encoder>
+	</appender>
+
+	<logger name="com.zaxxer.hikari.pool" level="INFO" />
+	<logger name="org.apache.zookeeper" level="${default.log.level}" />
+	<logger name="cn.uncode.schedule" level="INFO" />
+	<logger name="org.springframework.cache" level="${cache.log.level}" />
+
+	<root level="${default.log.level}">
+		<appender-ref ref="STDOUT" />
+		<appender-ref ref="IM-GATEWAY-FILE" />
+		<appender-ref ref="ERROR-FILE" />
+	</root>
+ 
+    <logger name="com.meilele.im.gateway.transport.server.KeepaliveHandler" level="INFO"
+		additivity="false">
+		<appender-ref ref="KEEPALIVE-FILE" />
+	</logger>
+	
+	<logger name="com.meilele.im.gateway.transport.server.OnlineUserStatisticsScheduledTask"
+		level="INFO" additivity="false">
+		<appender-ref ref="ONLINE-USER-FILE" />
+	</logger>
+
+	<logger name="io.netty.handler.logging.LoggingHandler" level="INFO"
+		additivity="false">
+		<appender-ref ref="NETTY-FILE" />
+	</logger>
+
+
+</configuration>

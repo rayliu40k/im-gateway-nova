@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+	http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+	http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd">
+
+	<context:annotation-config />
+	<context:component-scan base-package="com.meilele.im.gateway" />
+
+	<bean
+		class="org.springframework.context.support.PropertySourcesPlaceholderConfigurer">
+		<property name="ignoreUnresolvablePlaceholders" value="true" />
+		<property name="locations">
+			<list>
+				<value>classpath:META-INF/spring/config.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<!-- 网关传输服务器管理者 -->
+	<bean id="transportServerManager"
+		class="com.meilele.im.gateway.transport.server.TransportServerManager">
+		<property name="transportServers">
+			<list>
+				<ref bean="TCPTransportServer" />
+				<ref bean="WebTransportServer" />
+			</list>
+		</property>
+	</bean>
+
+	<!-- TCP传输服务器 -->
+	<bean id="TCPTransportServer"
+	class="com.meilele.im.gateway.transport.server.tcp.TCPTransportServer" />
+
+	<!-- Web传输服务器 -->
+	<bean id="WebTransportServer"
+		class="com.meilele.im.gateway.transport.server.web.WebTransportServer" />
+
+	<!-- token获取 配置开始 -->
+	<!-- sentinel配置 -->
+	<bean id="redisSentinelConfiguration"
+		class="org.springframework.data.redis.connection.RedisSentinelConfiguration">
+		<property name="master">
+			<bean class="org.springframework.data.redis.connection.RedisNode">
+				<property name="name" value="${redis.token.master}" />
+			</bean>
+		</property>
+
+		<property name="sentinels">
+			<set>
+				<bean class="org.springframework.data.redis.connection.RedisNode">
+					<constructor-arg name="host" value="${redis.token.node.host1}" />
+					<constructor-arg name="port" value="${redis.token.node.port1}" />
+				</bean>
+				<bean class="org.springframework.data.redis.connection.RedisNode">
+					<constructor-arg name="host" value="${redis.token.node.host2}" />
+					<constructor-arg name="port" value="${redis.token.node.port2}" />
+				</bean>
+				<bean class="org.springframework.data.redis.connection.RedisNode">
+					<constructor-arg name="host" value="${redis.token.node.host3}" />
+					<constructor-arg name="port" value="${redis.token.node.port3}" />
+				</bean>
+			</set>
+		</property>
+
+	</bean>
+
+	<!-- redis pool 配置 -->
+	<bean id="jedisPoolConfig" class="redis.clients.jedis.JedisPoolConfig">
+		<property name="maxTotal" value="30" />
+	</bean>
+
+	<bean id="jedisSentinelConnectionFactory"
+		class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory">
+		<property name="usePool" value="true" />
+		<property name="database" value="${redis.token.dbindex}" />
+		<property name="timeout" value="6000" />
+		<constructor-arg name="sentinelConfig" ref="redisSentinelConfiguration" />
+		<constructor-arg name="poolConfig" ref="jedisPoolConfig" />
+	</bean>
+
+	<!-- redis通用模版 -->
+	<bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate">
+		<property name="connectionFactory" ref="jedisSentinelConnectionFactory" />
+		<property name="keySerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+		</property>
+		<property name="valueSerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer">
+				<constructor-arg name="mapper">
+					<bean class="com.meilele.common.serializer.Jackson2TypedObjectMapper" />
+				</constructor-arg>
+			</bean>
+		</property>
+	</bean>
+
+	<!-- 分布式锁管理器 -->
+	<bean id="mLockManager" class="com.meilele.common.lock.MLockManager">
+		<constructor-arg name="masterName" value="${redis.token.master}" />
+		<constructor-arg>
+			<list>
+				<value>${redis.token.node.host1}:${redis.token.node.port1}</value>
+				<value>${redis.token.node.host2}:${redis.token.node.port2}</value>
+				<value>${redis.token.node.host3}:${redis.token.node.port3}</value>
+			</list>
+		</constructor-arg>
+	</bean>
+
+	<bean id="abstractTokenManager" abstract="true"
+		class="com.meilele.token.manager.AbstractTokenManager">
+		<property name="lockManager" ref="mLockManager" />
+		<property name="redisTemplate" ref="redisTemplate" />
+	</bean>
+	<!-- HTTP Token管理器 -->
+	<bean id="tokenManager" class="com.meilele.token.manager.WechatTokenManager"
+		parent="abstractTokenManager">
+		<!-- 期望token在缓存中个过期的时间 单位(s) -->
+		<constructor-arg index="0" value="${tokenExpired}" />
+		<constructor-arg index="1" value="${tokenUrl}" />
+		<constructor-arg index="2" value="${appId}" />
+		<constructor-arg index="3" value="${appSecret}" />
+	</bean>
+	<!--/token获取 配置结束 -->
+
+	<!-- 缓存管理 -->
+	<bean id="cacheManager"
+		class="org.springframework.cache.concurrent.ConcurrentMapCacheManager" />
+</beans>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+            http://www.springframework.org/schema/rabbit
+                http://www.springframework.org/schema/rabbit/spring-rabbit-1.6.xsd">
+
+    <!-- ==================== 消息接收与发送公共配置 ==================== -->
+
+    <bean id="validator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+        <property name="providerClass" value="org.hibernate.validator.HibernateValidator"/>
+    </bean>
+
+    <!-- 连接 -->
+    <rabbit:connection-factory id="rabbitConnectionFactory" virtual-host="${mq.virtual-host}" host="${mq.host}"
+                               publisher-confirms="true" publisher-returns="true" port="${mq.port}"
+                               username="${mq.username}" password="${mq.password}"/>
+
+    <!-- 消息转换器 -->
+    <bean id="jackson2JsonMessageConverter"
+          class="org.springframework.amqp.support.converter.Jackson2JsonMessageConverter">
+        <property name="jsonObjectMapper">
+            <bean class="com.meilele.common.serializer.Jackson2ObjectMapper">
+                <property name="dateFormat">
+                    <bean class="java.text.SimpleDateFormat">
+                        <constructor-arg type="java.lang.String" value="yyyy-MM-dd HH:mm:ss.SSS"/>
+                    </bean>
+                </property>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- 定义重试模板 -->
+    <bean id="retryTemplate" class="org.springframework.retry.support.RetryTemplate">
+        <property name="backOffPolicy">
+            <bean class="org.springframework.retry.backoff.ExponentialBackOffPolicy">
+                <!-- 重试开始时间 -->
+                <property name="initialInterval" value="${mq.initialInterval}"/>
+                <!-- 重试间隔时间增长倍数 -->
+                <property name="multiplier" value="${mq.multiplier}"/>
+                <!-- 最大重试间隔时间 -->
+                <property name="maxInterval" value="${mq.maxInterval}"/>
+            </bean>
+        </property>
+        <property name="retryPolicy">
+            <bean class="org.springframework.retry.policy.SimpleRetryPolicy">
+                <!-- 最大重试次数 -->
+                <property name="maxAttempts" value="${mq.maxAttempts}"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- admin,实现自动创建exchange和queue -->
+    <rabbit:admin connection-factory="rabbitConnectionFactory"/>
+	
+	 <!-- 定义队列 -->
+    <rabbit:queue id="imGatewayStandloneQueue" name="q.im-gateway.001.standlone"/>
+    <rabbit:queue id="imGatewayShareQueue" name="q.im-gateway.share"/>
+    
+    <!-- 交换机，队列的binding keys -->
+    <rabbit:topic-exchange name="tx.sys.app" delayed="true">
+        <rabbit:bindings>
+            <rabbit:binding queue="imGatewayStandloneQueue" pattern="tp.im-core.im-gateway.001.tcp.message"/>
+            <rabbit:binding queue="imGatewayShareQueue" pattern="tp.im-core.message.chat.message.wechat"/>
+        </rabbit:bindings>
+    </rabbit:topic-exchange>
+
+    <!-- ==================== 消息接收部分配置 ==================== -->
+    <!-- 注解扫描器 -->
+    <bean class="com.meilele.common.mq.RabbitListenerAnnotationBeanPostProcessor">
+        <property name="rabbitListenerContainerFactory">
+            <bean class="org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory">
+                <property name="connectionFactory" ref="rabbitConnectionFactory"/>
+                <property name="concurrentConsumers" value="5"/>
+                <property name="maxConcurrentConsumers" value="50"/>
+                <property name="prefetchCount" value="5"/>
+                <property name="messageConverter" ref="jackson2JsonMessageConverter"/>
+                <property name="errorHandler">
+                    <bean class="org.springframework.amqp.rabbit.listener.ConditionalRejectingErrorHandler"/>
+                </property>
+                <property name="adviceChain">
+                    <bean class="org.springframework.amqp.rabbit.config.StatefulRetryOperationsInterceptorFactoryBean">
+                        <property name="retryOperations" ref="retryTemplate"/>
+                    </bean>
+                </property>
+                <property name="acknowledgeMode" value="AUTO"/>
+            </bean>
+        </property>
+        <property name="messageHandlerMethodFactory">
+            <bean class="org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory">
+                <property name="validator" ref="validator"/>
+            </bean>
+        </property>
+    </bean>
+
+   
+
+    <!-- ==================== 消息投递部分配置 ==================== -->
+
+    <!-- 初始化模板 -->
+    <rabbit:template id="amqpTemplate" connection-factory="rabbitConnectionFactory" exchange="tx.sys.app"
+                     retry-template="retryTemplate" message-converter="jackson2JsonMessageConverter"/>
+
+    <!-- 消息发布者 -->
+    <bean id="eventPublisher" class="com.meilele.common.mq.EventPublisher">
+        <property name="amqpTemplate" ref="amqpTemplate"/>
+        <property name="validator" ref="validator"/>
+        <property name="systemName" value="im-gateway"/>  
+    </bean>
+</beans>
